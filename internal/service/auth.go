@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	domain "test-backend-1-curboturbo/internal/domain"
+	model "test-backend-1-curboturbo/internal/model"
 	port "test-backend-1-curboturbo/internal/port/outbound"
 	"time"
 	"github.com/google/uuid"
@@ -14,9 +15,8 @@ import (
 var tokenLiving = 2*time.Hour
 
 type AuthService interface{
-	Register(ctx context.Context, email string, password string) (err error)
+	Register(ctx context.Context, email string, password string, role string) (model.User, error)
 	Login(ctx context.Context, email string, password string) (accessToken string, err error)
-	Logout(ctx context.Context, userID string, role string) (error)
 	DummyLogin(ctx context.Context, role string) (accessToken string, err error)
 }
 
@@ -30,11 +30,11 @@ func NewAuthService(storage port.StorageProvider, tokenGen port.TokenProvider) A
 	return &authService{storage: storage, tokenGen: tokenGen}
 }
 
-func (s *authService) Register(ctx context.Context, email string, password string) (error){
-	bytes, er := bcrypt.GenerateFromPassword([]byte(password),bcrypt.DefaultCost);if er != nil{return er}
-	err := s.storage.Create(ctx, email, string(bytes))
-	if err != nil{return err}
-	return nil
+func (s *authService) Register(ctx context.Context, email string, password string, role string) (model.User, error){
+	bytes, er := bcrypt.GenerateFromPassword([]byte(password),bcrypt.DefaultCost);if er != nil{return model.User{}, er}
+	user, err := s.storage.Create(ctx, email, string(bytes), role)
+	if err != nil{return model.User{}, err}
+	return user, nil
 }
 
 
@@ -65,10 +65,4 @@ func (s *authService) DummyLogin(ctx context.Context, role string) (string, erro
         return "", fmt.Errorf("failed to generate dummy token: %w", err)
     }
     return token, nil
-}
-
-
-func (s *authService) Logout(ctx context.Context, userID string, role string) error {
-    fmt.Printf("Пользователь с ID %s нажал кнопку выхода\n", userID)   
-    return nil
 }

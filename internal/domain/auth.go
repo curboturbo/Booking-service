@@ -1,11 +1,23 @@
 package domain
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+	model "test-backend-1-curboturbo/internal/model"
+)
 
+type Token struct{
+	Type string
+    Description string
+}
+
+type Permission struct {
+	Role string
+}
 
 type RegisterRequest struct {
 	Email string `json:"email" binding:"required,min=3,max=32"`
 	Password string `json:"password" binding:"required,min=6"`
+	Role string `json:"role" binding:"required"`
 }
 
 type LoginRequest struct {
@@ -15,6 +27,11 @@ type LoginRequest struct {
 
 type DummyRequest struct {
 	Role string `json:"role" binding:"required"`
+}
+
+
+type RegisterResponse struct {
+    User model.User `json:"user"`
 }
 
 

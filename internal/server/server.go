@@ -26,7 +26,8 @@ func New(cfg *config.AppConfig, db *gorm.DB) *Server{
 	token_adapter := adapterJWT.NewTokenGenerator()
 	storage_adapter := adapterStorage.NewStorage(db)
 	auth_service := service.NewAuthService(storage_adapter,token_adapter)
-	router := router.RouterInit(auth_service, token_adapter)
+	booking_service := service.NewRoomService(storage_adapter)
+	router := router.RouterInit(auth_service,booking_service, token_adapter)
 	serv := &Server{
 		cfg: cfg,
 		http: &http.Server{

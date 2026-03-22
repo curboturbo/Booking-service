@@ -21,6 +21,9 @@ func main(){
 		panic("cannot load configs")
 	}
 	db, err := gorm.Open(postgres.Open(storagePath), &gorm.Config{})
+	if err := db.Exec(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`).Error; err != nil {
+        panic("failed to enable pgcrypto:")
+    }
 	server := server.New(cfg, db)
 	go func(){
 		if err :=server.Run();err!=nil{

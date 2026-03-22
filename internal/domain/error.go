@@ -1,4 +1,5 @@
 package domain
+import "errors"
 
 
 
@@ -15,13 +16,17 @@ const (
     ErrCodeInternalError       = "INTERNAL_ERROR"
 )
 
+var ErrEmailAlreadyTaken = errors.New("user with this email already exists")
+
+
 type ErrorDetail struct {
     Code    string `json:"code"`
     Message string `json:"message"`
 }
 
 type ErrorResponse struct {
-    Error ErrorDetail `json:"error"`
+    Code    string `json:"code"`
+    Message string `json:"message"`
 }
 
 type InternalErrorResponse struct {
@@ -30,9 +35,7 @@ type InternalErrorResponse struct {
 
 func NewError(code, message string) ErrorResponse {
     return ErrorResponse{
-        Error: ErrorDetail{
-            Code:    code,
-            Message: message,
-        },
+        Code:    code,
+        Message: message,
     }
 }
