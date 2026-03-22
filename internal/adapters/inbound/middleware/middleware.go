@@ -35,5 +35,4 @@ func (mid *AuthMiddleware) AuthenticationMiddleware() gin.HandlerFunc{
 		c.Set("role", role)
 		c.Next()
 	}
-
 }

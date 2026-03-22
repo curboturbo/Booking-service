@@ -16,7 +16,7 @@ var tokenLiving = 2*time.Hour
 type AuthService interface{
 	Register(ctx context.Context, email string, password string) (err error)
 	Login(ctx context.Context, email string, password string) (accessToken string, err error)
-	Logout(ctx context.Context, userID uuid.UUID, role string) (error)
+	Logout(ctx context.Context, userID string, role string) (error)
 	DummyLogin(ctx context.Context, role string) (accessToken string, err error)
 }
 
@@ -68,7 +68,7 @@ func (s *authService) DummyLogin(ctx context.Context, role string) (string, erro
 }
 
 
-func (s *authService) Logout(ctx context.Context, userID uuid.UUID, role string) error {
+func (s *authService) Logout(ctx context.Context, userID string, role string) error {
     fmt.Printf("Пользователь с ID %s нажал кнопку выхода\n", userID)   
     return nil
 }

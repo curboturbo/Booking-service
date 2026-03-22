@@ -6,7 +6,6 @@ import (
 	handler "test-backend-1-curboturbo/internal/port/inbound"
 	service "test-backend-1-curboturbo/internal/service"
 	domain "test-backend-1-curboturbo/internal/domain"
-	"github.com/google/uuid"
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,8 +17,6 @@ type authHandler struct{
 func NewAuthHandler(authService service.AuthService) handler.AuthHandler{
 	return &authHandler{userAuthService: authService}
 }
-
-
 
 func (auth *authHandler) Register(c *gin.Context){
 	var req domain.RegisterRequest
@@ -43,7 +40,6 @@ func (auth *authHandler) Register(c *gin.Context){
   c.JSON(http.StatusCreated, gin.H{
 	"message": "user registered successfully"})
 }
-
 
 func (auth *authHandler) Login(c *gin.Context){
 	var req domain.LoginRequest
@@ -84,7 +80,7 @@ func (auth *authHandler) Logout(c *gin.Context){
 			domain.ErrCodeUnauthorized, "unauthorized"))
         return
 	}
-	userID, ok1 := val.(uuid.UUID)
+	userID, ok1 := val.(string)
 	role, ok2 := roleVal.(string)
 	if !(ok1 && ok2){
 		c.JSON(http.StatusInternalServerError, domain.NewError(
