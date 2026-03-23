@@ -16,21 +16,20 @@ func NewAuthMiddleware(tp port.TokenProvider) *AuthMiddleware{
 	return &AuthMiddleware{tokenProvider: tp}
 }
 
-func (mid *AuthMiddleware) AuthenticationMiddleware(permission domain.Permission) gin.HandlerFunc {
-    return func(c *gin.Context) {
+func (mid *AuthMiddleware) auth(c *gin.Context) (string, string, bool){
         authHeader := c.GetHeader("Authorization")
         if authHeader == "" {
             c.JSON(http.StatusUnauthorized, domain.NewError(
-                domain.ErrCodeUnauthorized, "missing authorization header"))
+                domain.ErrCodeUnauthorized, "Не авторизован"))
             c.Abort()
-            return
+            return "","",false
         }
         parts := strings.Split(authHeader, " ")
         if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
             c.JSON(http.StatusUnauthorized, domain.NewError(
-                domain.ErrCodeUnauthorized, "invalid authorization format"))
+                domain.ErrCodeUnauthorized, "Не авторизован"))
             c.Abort()
-            return
+            return "","",false
         }
 
         token := parts[1]
@@ -39,17 +38,54 @@ func (mid *AuthMiddleware) AuthenticationMiddleware(permission domain.Permission
             c.JSON(http.StatusUnauthorized, domain.NewError(
                 domain.ErrCodeUnauthorized, "Не авторизован"))
             c.Abort()
-            return
+            return "","",false
         }
-        if (permission.Role == role){
+        return userID, role, true
+}
+
+
+func (mid *AuthMiddleware) AuthenticationAdminMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        userID, role, ok := mid.auth(c)
+        if !ok { return }
+        if (role == "admin"){
             c.Set("userID", userID)
             c.Set("role", role)
             c.Next()
         }else{
             c.JSON(http.StatusForbidden, domain.NewError(
-                domain.ErrCodeForbidden, "Нет прав"))
+                domain.ErrCodeForbidden, "Доступ запрещён (требуется роль admin)"))
             c.Abort()
             return
         }
+    }
+}
+
+
+func (mid *AuthMiddleware) AuthenticationUserMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        userID, role, ok := mid.auth(c)
+        if !ok { return }
+        if (role == "user"){
+            c.Set("userID", userID)
+            c.Set("role", role)
+            c.Next()
+        }else{
+            c.JSON(http.StatusForbidden, domain.NewError(
+                domain.ErrCodeForbidden, "Доступ запрещён (требуется роль admin)"))
+            c.Abort()
+            return
+        }
+    }
+}
+
+
+func (mid *AuthMiddleware) AuthenticationMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        userID, role, ok := mid.auth(c)
+        if !ok{return}
+        c.Set("userID", userID)
+        c.Set("role", role)
+        c.Next()
     }
 }

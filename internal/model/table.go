@@ -27,15 +27,16 @@ type Slot struct {
 
 type Booking struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	SlotID    uuid.UUID `gorm:"type:uuid;not null"` // Уникальность ниже в SQL
-	UserID    uuid.UUID `gorm:"type:uuid;not null;index:idx_user_bookings"`    // Индекс для "Мои брони"
+	SlotID    uuid.UUID `gorm:"type:uuid;not null;unique"`
+	UserID    uuid.UUID `gorm:"type:uuid;not null;index:idx_user_bookings"`
 	Status    string    `gorm:"default:'active'"`
+	Link string 		`gorm:"default:'-'"`
 	CreatedAt time.Time
 }
 
 type Schedule struct {
 	ID         uuid.UUID     `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	RoomID     uuid.UUID     `gorm:"type:uuid;index;not null"`
+	RoomID     uuid.UUID     `gorm:"type:uuid;unique;index;not null"`
 	DaysOfWeek pq.Int32Array `gorm:"type:integer[]"` 
 	StartTime  string        `gorm:"type:varchar(5);not null"` 
 	EndTime    string        `gorm:"type:varchar(5);not null"`
@@ -48,3 +49,6 @@ type User struct{
 	Role string `gorm:"default:'user'"`
 	Bookings []Booking `gorm:"foreignKey:UserID"`
 }
+
+//CREATE UNIQUE INDEX idx_unique_active_booking ON bookings (slot_id) WHERE status = 'active';
+// НЕ ЗАБЫТЬ ПОСТАВИТЬ ЧТОБЫ ПРОНИРАОВАНИЯ НЕ УЛЕТЕЛИ К ФИГАМ

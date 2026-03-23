@@ -12,6 +12,12 @@ type StorageProvider interface {
 	Create(ctx context.Context, email string, password string, role string) (models.User, error)
 	GetUser(ctx context.Context, email string) (id uuid.UUID, hashpassword string,role string, err error)
 	CreateAdmin(ctx context.Context, email string, password string) (error)
-	ShowRooms(ctx context.Context) ([]models.Room, error)
-	CreateRoom(ctx context.Context, room domain.Room) (models.Room, error)
+	
+	ShowRooms(ctx context.Context) ([]domain.Room, error)
+	CreateRoom(ctx context.Context, room domain.Room) (domain.Room, error)
+
+	CreateSchedule(ctx context.Context, sched domain.Schedule) (domain.Schedule, error)
+	TakeSlots(ctx context.Context, filterSlot domain.Slot) ([]domain.Slot, error)
+
+	CreateBooking(ctx context.Context, booking domain.Booking) (domain.Booking, error)
 }

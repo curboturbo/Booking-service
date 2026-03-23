@@ -65,10 +65,17 @@ func (auth *authHandler) Login(c *gin.Context){
 	ctx := c.Request.Context()
   	access_token, err := auth.userAuthService.Login(ctx, req.Email, req.Password)
   	if err != nil{
-		c.JSON(http.StatusUnauthorized, domain.NewError(
-			domain.ErrCodeUnauthorized, "Неверные учётные данные"))
-		return
-  	}
+            if errors.Is(err, domain.ErrUserNotFound){
+		    c.JSON(http.StatusUnauthorized, domain.NewError(
+		    	domain.ErrCodeUnauthorized, "Неверные учётные данные"))
+		    return
+            }
+            c.JSON(http.StatusInternalServerError, domain.NewError(
+            domain.ErrCodeInternalError,
+            "Внутренняя ошибка сервера",
+        ))
+        return
+  	    }
 	c.JSON(http.StatusOK, gin.H{
         "token": access_token,
     })

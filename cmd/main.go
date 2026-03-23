@@ -20,10 +20,19 @@ func main(){
 	if err != nil{
 		panic("cannot load configs")
 	}
+	//ставим расширения в БД
 	db, err := gorm.Open(postgres.Open(storagePath), &gorm.Config{})
 	if err := db.Exec(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`).Error; err != nil {
         panic("failed to enable pgcrypto:")
     }
+	query := `
+        CREATE INDEX IF NOT EXISTS idx_active_bookings_partial 
+        ON bookings (slot_id) 
+        WHERE status = 'active';`
+	if err := db.Exec(query).Error;err!=nil{
+		panic("enable create index")
+	}
+	
 	server := server.New(cfg, db)
 	go func(){
 		if err :=server.Run();err!=nil{
