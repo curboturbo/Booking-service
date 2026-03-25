@@ -30,6 +30,12 @@ var ErrSlotAlreadyTaken = errors.New("Слот уже занят")
 var ErrSlotDosntExist = errors.New("Слот не найден")
 
 
+var ErrBookingNotFound = errors.New("Бронь не найдена")
+var ErrTryChandeForeignBooking = errors.New("Не своя бронь или роль не user")
+var ErrBookingAlreadyCancel = errors.New("Бронь отменена (или уже была отменена ранее)")
+
+
+
 
 type ErrorDetail struct {
     Code    string `json:"code"`

@@ -5,6 +5,7 @@ import (
 	domain "test-backend-1-curboturbo/internal/domain"
 	port "test-backend-1-curboturbo/internal/port/outbound"
 	"time"
+	"github.com/google/uuid"
 )
 
 
@@ -14,6 +15,9 @@ type RoomService interface{
 	CreateSchedule(ctx context.Context, req domain.ScheduleCreateRequest) (domain.Schedule, error)
 	TakeSlots(ctx context.Context, req domain.AvailableSlotRequest) ([]domain.Slot, error)
 	ReserveSlot(ctx context.Context, req domain.CreateBookingRequest) (domain.Booking, error)
+	TakeUserBooking(ctx context.Context, userID uuid.UUID) ([]domain.Booking, error)
+	CancelUserBooking(ctx context.Context, req domain.RequestCancelBooking) (domain.Booking, error)
+	GetAllBooking(ctx context.Context, req domain.PaginationParams) ([]domain.Booking, error)
 }
 
 type roomService struct{
@@ -21,9 +25,10 @@ type roomService struct{
 	conference port.LinkConferenceProvider
 }
 
-func NewRoomService(storage port.StorageProvider) RoomService{
-	return &roomService{storage: storage}
+func NewRoomService(storage port.StorageProvider, conference port.LinkConferenceProvider) RoomService{
+	return &roomService{storage: storage, conference: conference}
 }
+
 
 func (s *roomService) DisplayRooms(ctx context.Context) ([]domain.Room, error) {
 	rooms, err := s.storage.ShowRooms(ctx)
@@ -95,4 +100,32 @@ func (s *roomService) ReserveSlot(ctx context.Context, req domain.CreateBookingR
         return domain.Booking{}, err
     }
     return createdBooking, nil
+}
+
+func (s *roomService) TakeUserBooking(ctx context.Context, userID uuid.UUID) ([]domain.Booking, error){
+	bookings, err := s.storage.TakeUserBooking(ctx,userID)
+	if err != nil{
+		return []domain.Booking{}, err
+	}
+	return bookings, nil
+}
+
+func (s *roomService) CancelUserBooking(ctx context.Context, req domain.RequestCancelBooking)(domain.Booking, error){
+	booking := domain.Booking{
+		ID: req.BookingID,
+		UserID: req.UserID,
+	}
+	cancel_booking, err := s.storage.CancelUserBooking(ctx,booking)
+	if err != nil{
+		return domain.Booking{}, err
+	}
+	return cancel_booking, nil
+}
+
+func (r *roomService) GetAllBooking(ctx context.Context, req domain.PaginationParams) ([]domain.Booking, error){
+	bookings, err := r.storage.GetAllBooking(ctx, req)
+	if err != nil{
+		return []domain.Booking{}, err
+	}
+	return bookings, nil
 }

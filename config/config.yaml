@@ -1,10 +1,10 @@
 env: local
 token_ttl: 1h
 http:
-  port: 8000
+  port: 8080
   timeout: 10h
 db:
-  host: localhost
+  host: avito_db
   port: "5432"
   username: app
   password: secret

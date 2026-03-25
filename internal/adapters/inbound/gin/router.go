@@ -16,28 +16,31 @@ func RouterInit(service service.AuthService, service_booking service.RoomService
 	authMiddleware := middleware.NewAuthMiddleware(tokenProvider)
 
 	api := router.Group("")
-	{
+	{	
+		api.GET("/_info", bookingHandler.GetInfo)
 		api.POST("/login", authHandler.Login)
 		api.POST("/register",authHandler.Register)
 		api.POST("/dummyLogin", authHandler.DummyLogin)
 		admin_permisson := api.Group("")
 		admin_permisson.Use(authMiddleware.AuthenticationAdminMiddleware())
 		{
-			//admin_premision -- КОГДА ВЫВОД В ПРОД
-			api.POST("/rooms/create",bookingHandler.CreateRoom)
-			api.POST("/rooms/:roomId/schedule/create", bookingHandler.CreateSchedule)
+			admin_permisson.POST("/rooms/create",bookingHandler.CreateRoom)
+			admin_permisson.POST("/rooms/:roomId/schedule/create", bookingHandler.CreateSchedule)
+			admin_permisson.GET("/bookings/list", bookingHandler.GetListOfBooking)
 		}
 		auth_permission := api.Group("")
 		auth_permission.Use(authMiddleware.AuthenticationMiddleware())
 		{
-			//auth_premission -- КОГДА ВЫВОД В ПРОД
-			api.GET("/rooms/list", bookingHandler.DisplayRooms)
-			api.GET("/rooms/{roomId}/slots/list", bookingHandler.TakeAvailableSlots)
+			auth_permission.GET("/rooms/list", bookingHandler.DisplayRooms)
+			auth_permission.GET("/rooms/{roomId}/slots/list", bookingHandler.TakeAvailableSlots)
 		}
+
 		user_premission := api.Group("")
 		user_premission.Use(authMiddleware.AuthenticationUserMiddleware())
 		{
-			api.POST("/bookings/create", bookingHandler.CreateReserving)
+			user_premission.POST("/bookings/create", bookingHandler.CreateReserving)
+			user_premission.GET("/bookings/my", bookingHandler.TakeUserBookings)
+			user_premission.POST("/bookings/:bookingId/cancel", bookingHandler.CancelBooking)
 		}
 	}
 	return router

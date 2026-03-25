@@ -27,6 +27,7 @@ type ScheduleCreateRequest struct{
 
 
 type Schedule struct{
+	ID uuid.UUID
 	RoomID uuid.UUID
 	DaysOfWeek []int
 	StartTime string
@@ -58,4 +59,16 @@ type Booking struct{
 	UserID uuid.UUID
 	Status string
 	Link string
+}
+
+
+type RequestCancelBooking struct{
+	UserID uuid.UUID
+	BookingID uuid.UUID
+}
+
+
+type PaginationParams struct {
+    Page     int `form:"page" binding:"omitempty,numeric,min=1"`
+    PageSize int `form:"pageSize" binding:"omitempty,numeric,min=1,max=100"`
 }

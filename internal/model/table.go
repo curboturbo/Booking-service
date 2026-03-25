@@ -27,7 +27,7 @@ type Slot struct {
 
 type Booking struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	SlotID    uuid.UUID `gorm:"type:uuid;not null;unique"`
+	SlotID    uuid.UUID `gorm:"type:uuid;not null"`
 	UserID    uuid.UUID `gorm:"type:uuid;not null;index:idx_user_bookings"`
 	Status    string    `gorm:"default:'active'"`
 	Link string 		`gorm:"default:'-'"`
@@ -49,6 +49,3 @@ type User struct{
 	Role string `gorm:"default:'user'"`
 	Bookings []Booking `gorm:"foreignKey:UserID"`
 }
-
-//CREATE UNIQUE INDEX idx_unique_active_booking ON bookings (slot_id) WHERE status = 'active';
-// НЕ ЗАБЫТЬ ПОСТАВИТЬ ЧТОБЫ ПРОНИРАОВАНИЯ НЕ УЛЕТЕЛИ К ФИГАМ

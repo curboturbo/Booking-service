@@ -31,6 +31,13 @@ func NewStorage(db *gorm.DB) port.StorageProvider {
     if err != nil{
         panic("cannot transfer migrations")
     }
+    query := `
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_active_bookings_partial 
+        ON bookings (slot_id) 
+        WHERE status = 'active';`
+	if err := db.Exec(query).Error;err!=nil{
+		panic("enable create index")
+	}
     return &storageConnector{
         db: db,
     }
@@ -120,6 +127,7 @@ func (s *storageConnector) CreateRoom(ctx context.Context, room domain.Room) (do
 	}
 
 	return domain.Room{
+        ID: model.ID,
 		Capacity: model.Capacity,
 		CreatedAt: model.CreatedAt,
 		Description: model.Description,
@@ -212,6 +220,7 @@ func (s *storageConnector) CreateSchedule(ctx context.Context, sched domain.Sche
         return domain.Schedule{}, domain.InternalError
     }
     return domain.Schedule{
+        ID: schedule.ID,
 		RoomID: schedule.RoomID,
 		StartTime: schedule.StartTime,
 		EndTime: schedule.EndTime,
@@ -223,7 +232,7 @@ func (s *storageConnector) TakeSlots(ctx context.Context, filterSlot domain.Slot
     date := time.Date(filterSlot.StartTime.Year(), filterSlot.StartTime.Month(), filterSlot.StartTime.Day(), 0, 0, 0, 0, time.UTC)
     err := s.db.WithContext(ctx).
         Select("id, room_id, start_time, end_time").
-        Where("room_id = ? AND start_time < ?", filterSlot.RoomId, date).
+        Where("room_id = ? AND start_time > ?", filterSlot.RoomId, date).
         Where("NOT EXISTS (SELECT 1 FROM bookings WHERE bookings.slot_id = slots.id AND bookings.status = 'active')").
         Find(&availableslots).Error
     if err != nil{
@@ -240,25 +249,26 @@ func (s *storageConnector) TakeSlots(ctx context.Context, filterSlot domain.Slot
 }
 
 
+
+func isUniqueViolation(err error) bool {
+    if pgErr, ok := err.(*pq.Error); ok {return pgErr.Code == "23505"}
+    return false
+}
+
+
 func (s *storageConnector) CreateBooking(ctx context.Context, booking domain.Booking) (domain.Booking, error){
-    query := `INSERT INTO bookings (slot_id, user_id, status,link,created_at)
+    query :=`
+    INSERT INTO bookings (slot_id, user_id, status, link, created_at)
     VALUES ($1, $2, 'active', $3, NOW())
-    ON CONFLICT (slot_id)
-    DO UPDATE SET
-        user_id = EXCLUDED.user_id,
-        status = 'active',
-        link = EXCLUDED.link,
-        created_at = NOW()
-    WHERE bookings.status = 'cancel'
-    RETURNING id, slot_id, user_id, status, link, created_at;
-    `
+    RETURNING id, slot_id, user_id, status, link, created_at;`
+
     var potential_booking models.Booking
     res := s.db.WithContext(ctx).Raw(query, booking.SlotID, booking.UserID, booking.Link).Scan(&potential_booking)
-    if res.Error != nil{
-        return domain.Booking{},domain.InternalError
-    }
-    if res.RowsAffected == 0{
-        return domain.Booking{}, domain.ErrSlotAlreadyTaken
+    if res.Error != nil {
+        if isUniqueViolation(res.Error) {
+            return domain.Booking{}, domain.ErrSlotAlreadyTaken
+        }
+        return domain.Booking{}, domain.InternalError
     }
     return domain.Booking{
         ID:potential_booking.ID,
@@ -267,4 +277,78 @@ func (s *storageConnector) CreateBooking(ctx context.Context, booking domain.Boo
         Status: potential_booking.Status,
         Link:potential_booking.Link,
     }, nil
+}
+
+func (s *storageConnector) TakeUserBooking(ctx context.Context, userID uuid.UUID) ([]domain.Booking, error) {
+    var user_bookings []models.Booking
+    res := s.db.WithContext(ctx).
+        Joins("JOIN slots ON bookings.slot_id = slots.id").
+        Where("bookings.user_id = ?", userID).
+        Where("bookings.status = 'active'").
+        Where("slots.start_time > ?", time.Now().UTC()).
+        Find(&user_bookings)
+
+    if res.Error != nil {
+        return nil, domain.InternalError
+    }
+
+    taken_bookings := make([]domain.Booking, len(user_bookings))
+    for i := range user_bookings {
+        taken_bookings[i].ID = user_bookings[i].ID
+        taken_bookings[i].UserID = user_bookings[i].UserID
+        taken_bookings[i].SlotID = user_bookings[i].SlotID
+        taken_bookings[i].Link = user_bookings[i].Link
+        taken_bookings[i].Status = user_bookings[i].Status
+    }
+    return taken_bookings, nil
+}
+
+
+func (s *storageConnector) CancelUserBooking(ctx context.Context, booking domain.Booking) (domain.Booking, error){
+    var cancelled_booking models.Booking
+    query := `
+    UPDATE bookings
+    SET status = 'cancelled'
+    WHERE id = ? AND user_id = ?
+    RETURNING id, slot_id, user_id, status, link, created_at;
+    `
+    res := s.db.WithContext(ctx).Raw(query, booking.ID, booking.UserID).Scan(&cancelled_booking)
+    if res.Error != nil{
+        return domain.Booking{}, domain.InternalError
+    }
+    if res.RowsAffected == 0{
+        var exist int
+        s.db.Raw("SELECT 1 FROM bookings WHERE id = ?", booking.ID).Scan(&exist)
+        if exist == 0{
+            return domain.Booking{}, domain.ErrBookingNotFound
+        }
+        return domain.Booking{}, domain.ErrTryChandeForeignBooking
+    }
+    return domain.Booking{
+        ID:     cancelled_booking.ID,
+        SlotID: cancelled_booking.SlotID,
+        UserID: cancelled_booking.UserID,
+        Status: cancelled_booking.Status,
+        Link:   cancelled_booking.Link,
+    }, nil
+}
+
+
+func (s *storageConnector) GetAllBooking(ctx context.Context, req domain.PaginationParams) ([]domain.Booking, error){
+    offset := (req.Page - 1) * req.PageSize
+    var bookings []models.Booking
+    res := s.db.Limit(req.PageSize).Offset(offset).Order("id asc").Find(&bookings)
+    if res.Error != nil{
+        return []domain.Booking{}, domain.InternalError
+    }
+    if len(bookings) == 0{return []domain.Booking{},nil}
+    taken_bookings := make([]domain.Booking, len(bookings))
+    for i := range bookings{
+        taken_bookings[i].ID = bookings[i].ID
+        taken_bookings[i].SlotID = bookings[i].SlotID
+        taken_bookings[i].UserID = bookings[i].UserID
+        taken_bookings[i].Status = bookings[i].Status
+        taken_bookings[i].Link = bookings[i].Link
+    }
+    return taken_bookings, nil
 }

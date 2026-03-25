@@ -20,4 +20,11 @@ type StorageProvider interface {
 	TakeSlots(ctx context.Context, filterSlot domain.Slot) ([]domain.Slot, error)
 
 	CreateBooking(ctx context.Context, booking domain.Booking) (domain.Booking, error)
+
+	TakeUserBooking(ctx context.Context, userID uuid.UUID) ([]domain.Booking, error)
+
+	CancelUserBooking(ctx context.Context, booking domain.Booking) (domain.Booking, error)
+
+	GetAllBooking(ctx context.Context, pag domain.PaginationParams) ([]domain.Booking, error)
+
 }
