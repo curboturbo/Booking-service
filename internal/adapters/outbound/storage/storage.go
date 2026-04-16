@@ -3,7 +3,8 @@ package storage
 import (
 	"context"
 	"errors"
-	"fmt"
+	"os"
+	"strconv"
 	"strings"
 	domain "test-backend-1-curboturbo/internal/domain"
 	models "test-backend-1-curboturbo/internal/model"
@@ -18,7 +19,6 @@ import (
 type storageConnector struct {
     db *gorm.DB
 }
-
 
 func NewStorage(db *gorm.DB) port.StorageProvider {
 	err := db.AutoMigrate(
@@ -136,95 +136,95 @@ func (s *storageConnector) CreateRoom(ctx context.Context, room domain.Room) (do
 }
 
 
-func (s *storageConnector) CreateSchedule(ctx context.Context, sched domain.Schedule) (domain.Schedule, error){
-    schedule := models.Schedule{
-        RoomID: sched.RoomID,
-        DaysOfWeek: ToPQInt32Array(sched.DaysOfWeek),
-        StartTime: sched.StartTime,
-        EndTime: sched.EndTime,
-    }
-    fmt.Print(schedule.RoomID)
-    var pqErr *pq.Error
-    var room models.Room
-    err := s.db.First(&room, "id = ?", schedule.RoomID).Error
-    if err != nil {
-        if errors.Is(err, gorm.ErrRecordNotFound) {
-            return domain.Schedule{}, domain.RoomNotFound
-        }
-        return domain.Schedule{}, domain.InternalError
-    }
-    res := s.db.WithContext(ctx).Create(&schedule)
+func (s *storageConnector) CreateSchedule(ctx context.Context, sched domain.Schedule) (domain.Schedule, error) {
+	var createdSchedule domain.Schedule
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		schedule := models.Schedule{
+			RoomID:     sched.RoomID,
+			DaysOfWeek: ToPQInt32Array(sched.DaysOfWeek),
+			StartTime:  sched.StartTime,
+			EndTime:    sched.EndTime,
+		}
 
-    if res.Error != nil {
-        if errors.As(res.Error, &pqErr) && pqErr.Code == "23505" {
-            return domain.Schedule{}, domain.ErrSchedultAlreayExist
-        }
-        return domain.Schedule{}, domain.InternalError
-    }
+		var room models.Room
+		err := tx.WithContext(ctx).First(&room, "id = ?", schedule.RoomID).Error
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return domain.RoomNotFound
+			}
+			return domain.InternalError
+		}
 
-    var slots []models.Slot
-    const delta = 30*time.Minute
-    timeLayout := "15:04"
-    slotBegin , _ := time.Parse(timeLayout, sched.StartTime)
-    slotEnd, _ := time.Parse(timeLayout, sched.EndTime)
-    now := time.Now().UTC()
-    cleanDay := time.Date(
-        now.Year(),
-        now.Month(),
-        now.Day(),
-        0,0,0,0,
-        time.UTC,
-    )
-    for i:=0;i<=14;i++{
-        curDate := cleanDay.AddDate(0,0,i)
-        day := int(curDate.Weekday())
-        if day == 0 {
-            day = 7
-        }
-        exist := false
-        for j:=range sched.DaysOfWeek{
-            if sched.DaysOfWeek[j] == day{
-                exist = true
-                break
-            }
-        }
-        if !exist{continue}
+		res := tx.WithContext(ctx).Create(&schedule)
+		if res.Error != nil {
+			var pqErr *pq.Error
+			if errors.As(res.Error, &pqErr) && pqErr.Code == "23505" {
+				return domain.ErrSchedultAlreayExist
+			}
+			return domain.InternalError
+		}
 
-        slotStart := time.Date(
-            curDate.Year(), curDate.Month(), curDate.Day(),
-            slotBegin.Hour(), slotBegin.Minute(), 0, 0, time.UTC,
-        )
-        
-        dayEndLimit := time.Date(
-            curDate.Year(), curDate.Month(), curDate.Day(),
-            slotEnd.Hour(), slotEnd.Minute(), 0, 0, time.UTC,
-        )
-        for{
-            nextWindow := slotStart.Add(delta)
-            if nextWindow.After(dayEndLimit){
-                break
-            }
-            slots = append(
-                slots,
-                models.Slot{
-                    RoomID: schedule.RoomID,
-                    StartTime: slotStart,
-                    EndTime: nextWindow,
-                },
-            )
-            slotStart = nextWindow
-        }
-    }
-    result := s.db.WithContext(ctx).CreateInBatches(slots, len(slots)-1)
-    if result.Error != nil{
-        return domain.Schedule{}, domain.InternalError
-    }
-    return domain.Schedule{
-        ID: schedule.ID,
-		RoomID: schedule.RoomID,
-		StartTime: schedule.StartTime,
-		EndTime: schedule.EndTime,
-	}, nil
+		var slots []models.Slot
+        d, _:= strconv.Atoi(os.Getenv("DELTA"))
+		var delta = time.Duration(d) * time.Minute
+		timeLayout := "15:04"
+		slotBegin, _ := time.Parse(timeLayout, sched.StartTime)
+		slotEnd, _ := time.Parse(timeLayout, sched.EndTime)
+		now := time.Now().UTC()
+		cleanDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+
+		for i := 0; i <= 14; i++ {
+			curDate := cleanDay.AddDate(0, 0, i)
+			day := int(curDate.Weekday())
+			if day == 0 {
+				day = 7
+			}
+			exist := false
+			for j := range sched.DaysOfWeek {
+				if sched.DaysOfWeek[j] == day {
+					exist = true
+					break
+				}
+			}
+			if !exist {
+				continue
+			}
+
+			slotStart := time.Date(curDate.Year(), curDate.Month(), curDate.Day(), slotBegin.Hour(), slotBegin.Minute(), 0, 0, time.UTC)
+			dayEndLimit := time.Date(curDate.Year(), curDate.Month(), curDate.Day(), slotEnd.Hour(), slotEnd.Minute(), 0, 0, time.UTC)
+
+			for {
+				nextWindow := slotStart.Add(delta)
+				if nextWindow.After(dayEndLimit) {
+					break
+				}
+				slots = append(slots, models.Slot{
+					RoomID:    schedule.RoomID,
+					StartTime: slotStart,
+					EndTime:   nextWindow,
+				})
+				slotStart = nextWindow
+			}
+		}
+		if len(slots) > 0 {
+			result := tx.WithContext(ctx).CreateInBatches(slots, len(slots))
+			if result.Error != nil {
+				return domain.InternalError
+			}
+		}
+		createdSchedule = domain.Schedule{
+			ID:        schedule.ID,
+			RoomID:    schedule.RoomID,
+			StartTime: schedule.StartTime,
+			EndTime:   schedule.EndTime,
+		}
+		return nil
+	})
+
+	if err != nil {
+		return domain.Schedule{}, err
+	}
+	return createdSchedule, nil
 }
 
 func (s *storageConnector) TakeSlots(ctx context.Context, filterSlot domain.Slot) ([]domain.Slot, error){

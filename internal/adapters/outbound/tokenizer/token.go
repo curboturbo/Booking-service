@@ -5,13 +5,14 @@ import (
 	"time"
 	"fmt"
 	"errors"
+	"os"
 	port "test-backend-1-curboturbo/internal/port/outbound"
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 )
 
 
-var secretKey = []byte("i_am_lazy_indian_programmer_from_2020")
+var secretKey = []byte(os.Getenv("JWT_KEY"))
 
 type tokenGenerator struct{}
 

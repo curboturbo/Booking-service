@@ -3,27 +3,23 @@ package server
 import (
 	"context"
 	"net/http"
+	"os"
 	"strconv"
-	config "test-backend-1-curboturbo/config"
+	"test-backend-1-curboturbo/internal/service"
+	"time"
+	"gorm.io/gorm"
 	router "test-backend-1-curboturbo/internal/adapters/inbound/gin"
+	conferenceAPIAdapter "test-backend-1-curboturbo/internal/adapters/outbound/API/conference"
 	adapterStorage "test-backend-1-curboturbo/internal/adapters/outbound/storage"
 	adapterJWT "test-backend-1-curboturbo/internal/adapters/outbound/tokenizer"
-	conferenceAPIAdapter "test-backend-1-curboturbo/internal/adapters/outbound/API/conference"
-	"test-backend-1-curboturbo/internal/service"
-
-	//"github.com/vertica/vertica-sql-go/logger"
-	"gorm.io/gorm"
 )
 
 
-
 type Server struct{
-	cfg *config.AppConfig
 	http *http.Server
-	//logger *log.Logger
 }
 
-func New(cfg *config.AppConfig, db *gorm.DB) *Server{
+func New(db *gorm.DB) *Server{
 	token_adapter := adapterJWT.NewTokenGenerator()
 	storage_adapter := adapterStorage.NewStorage(db)
 	conference_adapter := conferenceAPIAdapter.NewLinkConferenceService()
@@ -33,12 +29,14 @@ func New(cfg *config.AppConfig, db *gorm.DB) *Server{
 	
 	router := router.RouterInit(auth_service,booking_service, token_adapter)
 
+	port := os.Getenv("HTTP_PORT")
+	timeoutStr := os.Getenv("TIMEOUT")
+	timeoutVal, _ := strconv.Atoi(timeoutStr)
 	serv := &Server{
-		cfg: cfg,
 		http: &http.Server{
-			Addr: ":"+strconv.Itoa(cfg.Server.Port),
-			ReadTimeout: cfg.Server.TimeOut,
-			WriteTimeout: cfg.Server.TimeOut,
+			Addr: ":"+port,
+			ReadTimeout: time.Duration(timeoutVal) * time.Second,
+			WriteTimeout: time.Duration(timeoutVal) * time.Second,
 			Handler: router,
 		},
 	}

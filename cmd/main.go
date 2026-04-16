@@ -5,27 +5,30 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	loader "test-backend-1-curboturbo/internal/init"
-	server "test-backend-1-curboturbo/internal/server"
+	"fmt"
 	"time"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	server "test-backend-1-curboturbo/internal/server"
 )
 
 
 func main(){
 	errorChan := make(chan os.Signal,1)
 	signal.Notify(errorChan, os.Interrupt,syscall.SIGINT,syscall.SIGTERM)
-	cfg, err, storagePath := loader.LoadNewConfig("./config/config.yaml")
-	if err != nil{
-		panic("cannot load configs")
-	}
-	db, err := gorm.Open(postgres.Open(storagePath), &gorm.Config{})
+	storagePath := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
+    	os.Getenv("POSTGRES_USER"),
+        os.Getenv("POSTGRES_PASSWORD"),
+        os.Getenv("DB_HOST"),
+        os.Getenv("DB_PORT"),
+        os.Getenv("POSTGRES_DB"),
+    )
+	db, _ := gorm.Open(postgres.Open(storagePath), &gorm.Config{})
 	if err := db.Exec(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`).Error; err != nil {
         panic("failed to enable pgcrypto:")
     }
 	
-	server := server.New(cfg, db)
+	server := server.New(db)
 	go func(){
 		if err :=server.Run();err!=nil{
 			errorChan<-os.Interrupt

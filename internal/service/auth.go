@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
 	domain "test-backend-1-curboturbo/internal/domain"
 	model "test-backend-1-curboturbo/internal/model"
 	port "test-backend-1-curboturbo/internal/port/outbound"
@@ -12,7 +14,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var tokenLiving = 2*time.Hour
+var tokenLiving =os.Getenv("TOKEN_TIME_LIVIVNG")
 
 type AuthService interface{
 	Register(ctx context.Context, email string, password string, role string) (model.User, error)
@@ -44,7 +46,8 @@ func (s *authService) Login(ctx context.Context, email string, password string) 
 	if er := bcrypt.CompareHashAndPassword([]byte(hash),[]byte(password)); er !=nil{
 		return "", er
 	}
-	token, err := s.tokenGen.CreateToken(userID, role, tokenLiving)
+	intTokenLiving, _ := strconv.Atoi(tokenLiving)
+	token, err := s.tokenGen.CreateToken(userID, role,time.Duration(intTokenLiving)*time.Hour)
 	if err != nil{return "",err}
 	return token, nil
 }
@@ -60,7 +63,8 @@ func (s *authService) DummyLogin(ctx context.Context, role string) (string, erro
     default:
         return "", errors.New("no available role")
     }
-    token, err := s.tokenGen.CreateToken(targetID, role, tokenLiving)
+	intTokenLiving, _ := strconv.Atoi(tokenLiving)
+    token, err := s.tokenGen.CreateToken(targetID, role, time.Duration(intTokenLiving)*time.Hour)
     if err != nil {
         return "", fmt.Errorf("failed to generate dummy token: %w", err)
     }

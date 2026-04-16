@@ -5,22 +5,22 @@
 *.so
 *.dylib
 
-# Test binary, built with `go test -c`
+
 *.test
 
-# Code coverage profiles and other test artifacts
+
 *.out
 coverage.*
 *.coverprofile
 profile.cov
 
-# Dependency directories (remove the comment below to include it)
+
 vendor/
 
-# env file
 .env
+.INSTRUCTION.md
 
-# Editor/IDE
+
 .idea/
 .vscode/
 
